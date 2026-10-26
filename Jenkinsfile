@@ -62,9 +62,25 @@ pipeline {
 
         stage('OWASP: Dependency Check') {
             steps {
-                script {
-                    owasp_dependency()
-                }
+                dependencyCheck(
+                    odcInstallation: 'OWASP',
+                    additionalArguments: '''
+                        --scan backend
+                        --scan frontend
+                        --format HTML
+                        --format XML
+                        --out reports/dependency-check
+                    '''
+                )
+
+                dependencyCheckPublisher(
+                    pattern: 'reports/dependency-check/dependency-check-report.xml'
+                )
+
+                archiveArtifacts(
+                    artifacts: 'reports/dependency-check/dependency-check-report.html',
+                    allowEmptyArchive: true
+                )
             }
         }
 
