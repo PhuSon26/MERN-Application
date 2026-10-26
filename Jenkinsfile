@@ -8,7 +8,7 @@ pipeline {
         nodejs 'nodejs-22'
     }
 
-    environments {
+    environment {
         APP_NAME = "mern-application"
         RELEASE = "1.0.0"
         DOCKER_USER = "phuson0206"
