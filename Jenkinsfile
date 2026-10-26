@@ -1,3 +1,4 @@
+@Library('Shared') _
 pipeline {
     agent {
         label 'Jenkins-Agent'
@@ -9,40 +10,23 @@ pipeline {
     }
 
     environment {
-        APP_NAME = "mern-application"
-        RELEASE = "1.0.0"
-        BACKEND_IMAGE = "phuson0206/mern-application-backend"
-        FRONTEND_IMAGE = "phuson0206/mern-application-frontend"
-        DOCKER_USER = 'phuson0206'
-        DOCKER_PASS = 'dockerhub-tokens'
+        APP_NAME = 'mern-application'
+        RELEASE = '1.0.0'
+        BACKEND_IMAGE = 'phuson0206/mern-application-backend'
+        FRONTEND_IMAGE = 'phuson0206/mern-application-frontend'
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
 
     stages {
-        stage('Cleanup Workspace') {
+        stage('Workspace Cleanup') {
             steps {
                 cleanWs()
             }
         }
 
-        stage('Checkout') {
+        stage('Git: Code Checkout') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Check tools') {
-            steps {
-                sh '''
-                  echo "==== Java ===="
-                  java -version
-                  echo "==== Node.js ===="
-                  node --version
-                  npm --version
-                  echo "==== Docker ===="
-                  docker version
-                  docker compose version
-                '''
             }
         }
 
@@ -50,11 +34,7 @@ pipeline {
             steps {
                 sh '''
                     set -e
-
-                    echo "==== Backend dependencies ===="
                     npm ci --prefix backend
-
-                    echo "==== Frontend dependencies ===="
                     npm ci --prefix frontend
                 '''
             }
@@ -64,98 +44,102 @@ pipeline {
             steps {
                 dir('backend') {
                     sh '''
-                      set -e
-                      test -f server.js
-                      node --check server.js
+                        set -e
+                        test -f server.js
+                        node --check server.js
                     '''
                 }
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('Trivy: Filesystem Scan') {
             steps {
                 script {
-                    def scannerHome = tool 'SonarScanner'
-
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                              -Dsonar.projectKey=mern-application \
-                              -Dsonar.projectName=mern-application \
-                              -Dsonar.sources=backend,frontend/src \
-                              -Dsonar.sourceEncoding=UTF-8 \
-                              -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/**,**/.scannerwork/**
-                        """
-                    }
+                    trivy_scan()
                 }
             }
         }
 
-        stage('Quality Gate') {
+        stage('OWASP: Dependency Check') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    script {
-                        def qg = waitForQualityGate()
-
-                        if (qg.status != 'OK') {
-                            error "Quality Gate failed: ${qg.status}"
-                        }
-                    }
+                script {
+                    owasp_dependency()
                 }
             }
         }
 
-        stage('Build Frontend') {
+        stage('SonarQube: Code Analysis') {
+            steps {
+                script {
+                    sonarqube_analysis(
+                        'SonarQube',
+                        'mern-application',
+                        'mern-application'
+                    )
+                }
+            }
+        }
+
+        stage('SonarQube: Quality Gate') {
+            steps {
+                script {
+                    sonarqube_code_quality()
+                }
+            }
+        }
+
+        stage('Frontend: Build') {
             steps {
                 dir('frontend') {
-                    sh '''
-                      set -e
-                      npm run build
-                    '''
+                    sh 'npm run build'
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Docker: Build Images') {
             steps {
                 script {
-                    docker.build("${BACKEND_IMAGE}:${IMAGE_TAG}", "-f backend/Dockerfile backend")
-                    docker.build("${FRONTEND_IMAGE}:${IMAGE_TAG}", "-f frontend/Dockerfile frontend")
+                    docker.build(
+                        "${BACKEND_IMAGE}:${IMAGE_TAG}",
+                        '-f backend/Dockerfile backend'
+                    )
+
+                    docker.build(
+                        "${FRONTEND_IMAGE}:${IMAGE_TAG}",
+                        '-f frontend/Dockerfile frontend'
+                    )
                 }
             }
         }
 
-        stage('Trivy Image Scan') {
+        stage('Trivy: Image Scan') {
             steps {
                 sh '''
-                  set -e
-                  trivy image \
-                    --scanners vuln \
-                    --severity HIGH,CRITICAL \
-                    --exit-code 0 \
-                    --no-progress \
-                    "${BACKEND_IMAGE}:${IMAGE_TAG}"
+                    set -e
+                    trivy image --scanners vuln \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 0 --no-progress \
+                        "${BACKEND_IMAGE}:${IMAGE_TAG}"
 
-                  trivy image \
-                    --scanners vuln \
-                    --severity HIGH,CRITICAL \
-                    --exit-code 0 \
-                    --no-progress \
-                    "${FRONTEND_IMAGE}:${IMAGE_TAG}"                  
+                    trivy image --scanners vuln \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 0 --no-progress \
+                        "${FRONTEND_IMAGE}:${IMAGE_TAG}"
                 '''
             }
         }
 
-        stage('Push Docker Images') {
+        stage('Docker: Push to DockerHub') {
             steps {
                 script {
                     docker.withRegistry('', 'dockerhub-tokens') {
-                        def backend = docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}")
-                        def frontend = docker.image("${FRONTEND_IMAGE}:${IMAGE_TAG}")
-                        backend.push()
-                        backend.push('latest')
-                        frontend.push()
-                        frontend.push('latest')
+                        docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}").push()
+
+                        docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}").push('latest')
+
+                        docker.image("${FRONTEND_IMAGE}:${IMAGE_TAG}").push()
+
+                        docker.image("${FRONTEND_IMAGE}:${IMAGE_TAG}").push('latest')
                     }
                 }
             }
@@ -164,8 +148,8 @@ pipeline {
         stage('Cleanup Artifacts') {
             steps {
                 sh '''
-                  docker rmi ${BACKEND_IMAGE}:$IMAGE_TAG}
-                  docker rmi ${FRONTEND_IMAGE}:$IMAGE_TAG}
+                    docker rmi "${BACKEND_IMAGE}:${IMAGE_TAG}"
+                    docker rmi "${FRONTEND_IMAGE}:${IMAGE_TAG}"
                 '''
             }
         }
@@ -173,11 +157,18 @@ pipeline {
 
     post {
         success {
-            echo "Checkout and environments check passed."
+            echo 'MERN CI pipeline completed successfully.'
         }
 
         failure {
-            echo "Pipeline failed. Check console output."
+            echo 'Pipeline failed. Check Console Output.'
+        }
+
+        always {
+            cleanWs(
+                cleanWhenFailure: false,
+                notFailBuild: true
+            )
         }
     }
 }
