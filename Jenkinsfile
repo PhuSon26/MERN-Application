@@ -46,6 +46,20 @@ pipeline {
             }
         }
 
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "==== Backend dependencies ===="
+                    npm ci --prefix backend
+
+                    echo "==== Frontend dependencies ===="
+                    npm ci --prefix frontend
+                '''
+            }
+        }
+
         stage('Check Backend') {
             steps {
                 dir('backend') {
