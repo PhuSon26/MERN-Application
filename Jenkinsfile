@@ -11,7 +11,9 @@ pipeline {
     environment {
         APP_NAME = "mern-application"
         RELEASE = "1.0.0"
-        DOCKER_USER = "phuson0206"
+        BACKEND_IMAGE = "phuson0206/mern-application-backend"
+        FRONTEND_IMAGE = "phuson0206/mern-application-frontend"
+        DOCKER_USER = 'phuson0206'
         DOCKER_PASS = 'dockerhub-tokens'
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
@@ -58,7 +60,7 @@ pipeline {
             }
         }
 
-        stage('Checl Backend') {
+        stage('Check Backend') {
             steps {
                 dir('backend') {
                     sh '''
@@ -66,6 +68,39 @@ pipeline {
                       test -f server.js
                       node --check server.js
                     '''
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarScanner'
+
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=mern-application \
+                              -Dsonar.projectName=mern-application \
+                              -Dsonar.sources=backend,frontend/src \
+                              -Dsonar.sourceEncoding=UTF-8 \
+                              -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/**,**/.scannerwork/**
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    script {
+                        def qg = waitForQualityGate()
+
+                        if (qg.status != 'OK') {
+                            error "Quality Gate failed: ${qg.status}"
+                        }
+                    }
                 }
             }
         }
@@ -84,8 +119,44 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${DOCKER_USER}/mern-application-backend:${IMAGE_TAG}", "-f backend/Dockerfile backend")
-                    docker.build("${DOCKER_USER}/mern-application-frontend:${IMAGE_TAG}", "-f frontend/Dockerfile frontend")
+                    docker.build("${BACKEND_IMAGE}:${IMAGE_TAG}", "-f backend/Dockerfile backend")
+                    docker.build("${FRONTEND_IMAGE}:${IMAGE_TAG}", "-f frontend/Dockerfile frontend")
+                }
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                  set -e
+                  trivy image \
+                    --scanners vuln \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 0 \
+                    --no-progress \
+                    "${BACKEND_IMAGE}:${IMAGE_TAG}"
+
+                  trivy image \
+                    --scanners vuln \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 0 \
+                    --no-progress \
+                    "${FRONTEND_IMAGE}:${IMAGE_TAG}"                  
+                '''
+            }
+        }
+
+        stage('Push Docker Images') {
+            steps {
+                script {
+                    docker.withRegistry('', 'dockerhub-tokens') {
+                        def backend = docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}")
+                        def frontend = docker.image("${FRONTEND_IMAGE}:${IMAGE_TAG}")
+                        backend.push()
+                        backend.push('latest')
+                        frontend.push()
+                        frontend.push('latest')
+                    }
                 }
             }
         }
