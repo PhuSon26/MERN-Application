@@ -46,20 +46,6 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                  set -e
-                  echo "==== Root dependencies ===="
-                  npm ci
-                  echo "==== Backend dependencies ===="
-                  npm ci --prefix backend
-                  echo "==== Frontend dependencies ===="
-                  npm ci --prefix frontend
-                '''
-            }
-        }
-
         stage('Check Backend') {
             steps {
                 dir('backend') {
@@ -158,6 +144,15 @@ pipeline {
                         frontend.push('latest')
                     }
                 }
+            }
+        }
+
+        stage('Cleanup Artifacts') {
+            steps {
+                sh '''
+                  docker rmi ${BACKEND_IMAGE}:$IMAGE_TAG}
+                  docker rmi ${FRONTEND_IMAGE}:$IMAGE_TAG}
+                '''
             }
         }
     }
