@@ -25,12 +25,12 @@ pipeline {
             steps {
                 sh '''
                   echo "==== Java ===="
-                  java -verison
+                  java -version
                   echo "==== Node.js ===="
                   node --version
                   npm --version
                   echo "==== Docker ===="
-                  docker verison
+                  docker version
                   docker compose version
                 '''
             }
