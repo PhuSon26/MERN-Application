@@ -5,7 +5,7 @@ pipeline {
 
     tools {
         jdk 'jdk21'
-        node 'nodejs21'
+        nodejs 'nodejs21'
     }
 
     stages {
