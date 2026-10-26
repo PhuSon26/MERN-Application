@@ -1,23 +1,25 @@
-# Stage 1
-FROM node:21 AS backend-builder
+# Stage 1: Install dependencies
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
 
 COPY . .
 
-RUN npm i
-
-RUN npm run test
-
-# Stage 2
-FROM node:21-slim
+# Stage 2: Production image
+FROM node:22-bookworm-slim AS production
 
 WORKDIR /app
 
-COPY --from=backend-builder /app .
+ENV NODE_ENV=production
 
-COPY .env.docker .env
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/ ./
 
 EXPOSE 8080
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

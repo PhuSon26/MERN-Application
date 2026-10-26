@@ -1,21 +1,19 @@
-# ------------------- Stage 1: Build Stage ------------------------------
-FROM node:21 AS frontend-builder
+# Stage 1: Build React application
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-
-RUN npm install
+RUN npm ci
 
 COPY . .
+RUN npm run build
 
-# ------------------- Stage 2: Final Stage ------------------------------
-FROM node:21-slim
+# Stage 2: Serve static files
+FROM nginx:alpine
 
-WORKDIR /app
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY --from=frontend-builder /app .
+EXPOSE 80
 
-EXPOSE 5173
-
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["nginx", "-g", "daemon off;"]
