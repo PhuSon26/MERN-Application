@@ -81,17 +81,20 @@ pipeline {
 
         stage('SonarQube: Code Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        set -e
+                script {
+                    def scannerHome = tool 'SonarScanner'
 
-                        sonar-scanner \
-                            -Dsonar.projectName=mern-application \
-                            -Dsonar.projectKey=mern-application \
-                            -Dsonar.sources=backend,frontend \
-                            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/** \
-                            -X
-                    '''
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            set -e
+
+                            ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.projectName=mern-application \
+                                -Dsonar.projectKey=mern-application \
+                                -Dsonar.sources=backend,frontend \
+                                -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/**
+                        """
+                    }
                 }
             }
         }
