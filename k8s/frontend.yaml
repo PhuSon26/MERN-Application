@@ -22,12 +22,12 @@ spec:
       namespace: mern-app
     spec:
       containers:
-        - image: mern-application-frontend
+        - name: mern-frontend
+          image: phuson0206/mern-application-frontend:1.0.0-35
           imagePullPolicy: Always
-          name: mern-frontend
           ports:
-            - containerPort: 8080
-              name: tcp
+            - containerPort: 80
+              name: http
               protocol: TCP
 ---
 apiVersion: v1
@@ -36,16 +36,11 @@ metadata:
   name: frontend-service
   namespace: mern-app
 spec:
-  internalTrafficPolicy: Cluster
-  ipFamilies:
-    - IPv4
-  ipFamilyPolicy: SingleStack
-  ports:
-    - name: tcp
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
+  type: ClusterIP
   selector:
     app: frontend
-  sessionAffinity: None
-  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

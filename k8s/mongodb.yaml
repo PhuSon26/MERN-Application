@@ -1,30 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: mongodb
   name: mongodb-deployment
   namespace: mern-app
 spec:
-  replicas: 2
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: mongodb
-  strategy:
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-    type: RollingUpdate
   template:
     metadata:
       labels:
         app: mongodb
-      namespace: mern-app
     spec:
       containers:
-        - image: mern-application-mongodb
-          imagePullPolicy: Always
-          name: mern-mongodb
+        - name: mern-mongodb
+          image: mongo:8
           ports:
             - containerPort: 27017
           volumeMounts:
@@ -41,16 +34,10 @@ metadata:
   name: mongodb-service
   namespace: mern-app
 spec:
-  internalTrafficPolicy: Cluster
-  ipFamilies:
-    - IPv4
-  ipFamilyPolicy: SingleStack
-  ports:
-    - name: tcp
-      port: 27017
-      protocol: TCP
-      targetPort: 27017
+  type: ClusterIP
   selector:
     app: mongodb
-  sessionAffinity: None
-  type: ClusterIP
+  ports:
+    - port: 27017
+      targetPort: 27017
+      protocol: TCP

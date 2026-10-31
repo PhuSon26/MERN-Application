@@ -1,39 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: redis
   name: redis-deployment
   namespace: mern-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: redis
-  strategy:
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-    type: RollingUpdate
   template:
     metadata:
       labels:
         app: redis
-      namespace: mern-app
     spec:
       containers:
-        - image: mern-application-redis
-          imagePullPolicy: Always
-          name: mern-redis
+        - name: mern-redis
+          image: redis:7.4.11-alpine
           ports:
             - containerPort: 6379
-          volumeMounts:
-            - name: mongodb-storage
-              mountPath: /var/lib/redis/dump.rdb
-      volumes:
-        - name: mongodb-storage
-          persistentVolumeClaim:
-            claimName: mongodb-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -41,16 +25,10 @@ metadata:
   name: redis-service
   namespace: mern-app
 spec:
-  internalTrafficPolicy: Cluster
-  ipFamilies:
-    - IPv4
-  ipFamilyPolicy: SingleStack
-  ports:
-    - name: tcp
-      port: 6379
-      protocol: TCP
-      targetPort: 6379
+  type: ClusterIP
   selector:
     app: redis
-  sessionAffinity: None
-  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP

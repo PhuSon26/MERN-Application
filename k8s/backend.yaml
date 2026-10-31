@@ -22,7 +22,7 @@ spec:
       namespace: mern-app
     spec:
       containers:
-        - image: mern-application-backend
+        - image: phuson0206/mern-application-backend
           imagePullPolicy: Always
           name: mern-backend
           ports:
