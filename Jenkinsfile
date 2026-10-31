@@ -59,12 +59,20 @@ pipeline {
                 }
             }
         }
-        
-        stage("OWASP: Dependency check"){
-            steps{
-                script{
-                    owasp_dependency()
-                }
+
+        stage('OWASP: Dependency check') {
+            steps {
+                dependencyCheck(
+                    additionalArguments: '''
+                        --scan ./
+                        --disableKnownExploited
+                    ''',
+                    odcInstallation: 'OWASP'
+                )
+
+                dependencyCheckPublisher(
+                    pattern: '**/dependency-check-report.xml'
+                )
             }
         }
 
@@ -134,11 +142,9 @@ pipeline {
                 script {
                     docker.withRegistry('', 'dockerhub-tokens') {
                         docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}").push()
-
                         docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}").push('latest')
 
                         docker.image("${FRONTEND_IMAGE}:${IMAGE_TAG}").push()
-
                         docker.image("${FRONTEND_IMAGE}:${IMAGE_TAG}").push('latest')
                     }
                 }
