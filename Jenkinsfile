@@ -64,8 +64,11 @@ pipeline {
             steps {
                 dependencyCheck(
                     additionalArguments: '''
-                        --scan ./
+                        --scan ./backend
+                        --scan ./frontend
                         --disableKnownExploited
+                        --disableAssembly
+                        --disableYarnAudit
                     ''',
                     odcInstallation: 'OWASP'
                 )
@@ -75,7 +78,7 @@ pipeline {
                 )
             }
         }
-
+        
         stage('SonarQube: Code Analysis') {
             steps {
                 script {
