@@ -62,6 +62,9 @@ pipeline {
 
         stage('OWASP: Dependency Check') {
             steps {
+                sh '''
+                    mkdir -p reports/dependency-check
+                '''
                 dependencyCheck(
                     odcInstallation: 'OWASP',
                     nvdCredentialsId: 'nvd-api-key',
@@ -73,8 +76,19 @@ pipeline {
                         --out reports/dependency-check
                     '''
                 )
-
-                dependencyCheckPublisher(pattern: 'reports/dependency-check/dependency-check-report.xml')
+                sh '''
+                    echo "Checking Dependency-Check reports..."
+                    find reports -type f -print
+                '''
+                dependencyCheckPublisher(
+                    pattern: 'reports/dependency-check/dependency-check-report.xml',
+                    failedTotalCritical: 0,
+                    failedTotalHigh: 0
+                )
+                archiveArtifacts(
+                    artifacts: 'reports/dependency-check/*',
+                    allowEmptyArchive: false
+                )
             }
         }
 
