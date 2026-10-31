@@ -78,15 +78,20 @@ pipeline {
                 )
             }
         }
-        
+
         stage('SonarQube: Code Analysis') {
             steps {
-                script {
-                    sonarqube_analysis(
-                        'SonarQube',
-                        'mern-application',
-                        'mern-application'
-                    )
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        set -e
+
+                        sonar-scanner \
+                            -Dsonar.projectName=mern-application \
+                            -Dsonar.projectKey=mern-application \
+                            -Dsonar.sources=backend,frontend \
+                            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/coverage/** \
+                            -X
+                    '''
                 }
             }
         }
@@ -127,6 +132,7 @@ pipeline {
             steps {
                 sh '''
                     set -e
+
                     trivy image --scanners vuln \
                         --severity HIGH,CRITICAL \
                         --exit-code 0 --no-progress \
