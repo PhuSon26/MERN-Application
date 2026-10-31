@@ -59,36 +59,43 @@ pipeline {
                 }
             }
         }
-
+        
         stage('OWASP: Dependency Check') {
             steps {
-                sh '''
-                    mkdir -p reports/dependency-check
-                '''
-                dependencyCheck(
-                    odcInstallation: 'OWASP',
-                    nvdCredentialsId: 'nvd-api-key',
-                    additionalArguments: '''
-                        --scan backend
-                        --scan frontend
-                        --format HTML
-                        --format XML
-                        --out reports/dependency-check
+                script {
+                    sh '''
+                        set -e
+                        mkdir -p reports/dependency-check
                     '''
-                )
-                sh '''
-                    echo "Checking Dependency-Check reports..."
-                    find reports -type f -print
-                '''
-                dependencyCheckPublisher(
-                    pattern: 'reports/dependency-check/dependency-check-report.xml',
-                    failedTotalCritical: 0,
-                    failedTotalHigh: 0
-                )
-                archiveArtifacts(
-                    artifacts: 'reports/dependency-check/*',
-                    allowEmptyArchive: false
-                )
+                    dependencyCheck(
+                        odcInstallation: 'OWASP',
+                        nvdCredentialsId: 'nvd-api-key',
+                        additionalArguments: '''
+                            --scan backend
+                            --scan frontend
+                            --format HTML
+                            --format XML
+                            --out reports/dependency-check
+                            --prettyPrint
+                        '''
+                    )
+                    sh '''
+                        echo "========== Dependency-Check Reports =========="
+                        find reports/dependency-check -maxdepth 2 -type f -ls
+                        echo "========== Verify XML Report =========="
+                        test -s reports/dependency-check/dependency-check-report.xml
+                        echo "XML report exists and is not empty."
+                    '''
+                    dependencyCheckPublisher(
+                        pattern: 'reports/dependency-check/dependency-check-report.xml',
+                        failedTotalCritical: 0,
+                        failedTotalHigh: 0
+                    )
+                    archiveArtifacts(
+                        artifacts: 'reports/dependency-check/*',
+                        allowEmptyArchive: false
+                    )
+                }
             }
         }
 
