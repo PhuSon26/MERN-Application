@@ -11,6 +11,10 @@ ingressClass:
 providers:
   kubernetesIngress:
     enabled: true
+    publishedService:
+      enabled: false
+    ingressEndpoint:
+      ip: "192.168.212.51"
   kubernetesCRD:
     enabled: true
 
