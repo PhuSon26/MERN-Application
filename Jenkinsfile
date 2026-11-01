@@ -1,4 +1,5 @@
 @Library('Shared') _
+
 pipeline {
     agent {
         label 'Jenkins-Agent'
@@ -163,6 +164,23 @@ pipeline {
             }
         }
 
+        stage('Trigger CD Pipeline') {
+            steps {
+                script {
+                    echo "Triggering MERN CD with IMAGE_TAG=${IMAGE_TAG}"
+
+                    build job: 'mern-cd',
+                        parameters: [
+                            string(
+                                name: 'IMAGE_TAG',
+                                value: env.IMAGE_TAG
+                            )
+                        ],
+                        wait: false
+                }
+            }
+        }
+
         stage('Cleanup Artifacts') {
             steps {
                 sh '''
@@ -175,11 +193,80 @@ pipeline {
 
     post {
         success {
-            echo 'MERN CI pipeline completed successfully.'
+            script {
+                def message = """
+                    :rocket: *MERN CI SUCCESS*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Image Tag:* ${env.IMAGE_TAG}
+                    *Status:* Docker images pushed and CD triggered
+                    *Build URL:* ${env.BUILD_URL}
+                    """.stripIndent().trim()
+                try {
+                    withCredentials([
+                        string(
+                            credentialsId: 'slack-webhook',
+                            variable: 'SLACK_WEBHOOK_URL'
+                        )
+                    ]) {
+                        writeFile(
+                            file: 'slack-payload.json',
+                            text: groovy.json.JsonOutput.toJson([text: message])
+                        )
+
+                        sh '''
+                            set +x
+                            curl --fail --silent --show-error \
+                              --connect-timeout 10 \
+                              --max-time 20 \
+                              -X POST \
+                              -H 'Content-Type: application/json' \
+                              --data-binary @slack-payload.json \
+                              "$SLACK_WEBHOOK_URL"
+                        '''
+                    }
+                } catch (err) {
+                    echo "Slack notification failed: ${err.getMessage()}"
+                }
+            }
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output.'
+            script {
+                def message = """
+                    :rotating_light: *MERN CI FAILED*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Image Tag:* ${env.IMAGE_TAG}
+                    *Build URL:* ${env.BUILD_URL}
+                    """.stripIndent().trim()
+                try {
+                    withCredentials([
+                        string(
+                            credentialsId: 'slack-webhook',
+                            variable: 'SLACK_WEBHOOK_URL'
+                        )
+                    ]) {
+                        writeFile(
+                            file: 'slack-payload.json',
+                            text: groovy.json.JsonOutput.toJson([text: message])
+                        )
+
+                        sh '''
+                            set +x
+                            curl --fail --silent --show-error \
+                              --connect-timeout 10 \
+                              --max-time 20 \
+                              -X POST \
+                              -H 'Content-Type: application/json' \
+                              --data-binary @slack-payload.json \
+                              "$SLACK_WEBHOOK_URL"
+                        '''
+                    }
+                } catch (err) {
+                    echo "Slack notification failed: ${err.getMessage()}"
+                }
+            }
         }
 
         always {
